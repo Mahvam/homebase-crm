@@ -1,0 +1,232 @@
+{% extends "base_admin.html" %}
+
+{% block page_title %}AI Follow-Up Email{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">Generate a warm, personalized follow-up email in your voice — review, tweak, and copy.</p>{% endblock %}
+
+{% block content %}
+<div x-data="emailGen()" class="grid-2" style="align-items: start; gap: 20px;">
+
+    <!-- LEFT: Lead details form -->
+    <div class="card">
+        <h3 style="color: var(--text-primary); font-weight: 600; font-size: 0.95rem; margin: 0 0 16px;">Lead Details</h3>
+
+        <!-- Optional: pick an existing lead to autofill -->
+        <div class="form-group">
+            <label class="form-label">Use an existing lead (optional)</label>
+            <select x-model="selectedId" @change="loadLead()">
+                <option value="">— Type a new lead below —</option>
+                {% for c in contacts %}
+                <option value="{{ c.id }}">{{ c.name }}{% if c.status %} — {{ c.status }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Lead name <span class="required">*</span></label>
+            <input type="text" x-model="lead.name" placeholder="e.g. Sarah Johnson">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Lead source</label>
+                <select x-model="lead.lead_source">
+                    <option value="">Select...</option>
+                    {% for s in lead_sources %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Lead type</label>
+                <select x-model="lead.lead_type">
+                    {% for t in lead_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Pipeline stage</label>
+            <select x-model="lead.stage">
+                {% for st in stages %}<option value="{{ st }}">{{ st }}</option>{% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Notes / what they're looking for</label>
+            <textarea x-model="lead.notes" rows="4" placeholder="e.g. Looking for a 3 bed 2 bath in St. Joseph, budget around $250k, said maybe in the spring"></textarea>
+        </div>
+
+        <button class="btn btn-primary" style="width: 100%;" @click="generate()" :disabled="generating || !lead.name.trim()">
+            <span x-show="!generating">✨ Generate Email</span>
+            <span x-show="generating" class="flex items-center gap-2" style="justify-content: center;">
+                <span class="spinner spinner-sm"></span> Writing in your voice...
+            </span>
+        </button>
+    </div>
+
+    <!-- RIGHT: Generated email -->
+    <div class="card">
+        <div class="flex items-center justify-between" style="margin-bottom: 16px;">
+            <h3 style="color: var(--text-primary); font-weight: 600; font-size: 0.95rem; margin: 0;">Your Email</h3>
+            <button class="btn btn-sm btn-outline" @click="copy()" x-show="result" x-text="copied ? 'Copied!' : 'Copy'"></button>
+        </div>
+
+        <template x-if="!result && !generating">
+            <div class="empty-state" style="padding: 40px 16px;">
+                <div class="empty-state-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </div>
+                <p class="empty-state-description">Fill in the lead details and click <strong>Generate Email</strong>. You can edit the result before copying.</p>
+            </div>
+        </template>
+
+        <div x-show="generating" style="padding: 40px 0; text-align: center; color: var(--text-subtle);">
+            <span class="spinner"></span>
+            <p style="margin-top: 12px; font-size: 0.85rem;">Crafting a warm, personal note...</p>
+        </div>
+
+        <div x-show="result" x-cloak>
+            <textarea x-model="result" rows="14" style="width: 100%; font-size: 0.9rem; line-height: 1.6;"></textarea>
+            <p x-show="isDemo" style="font-size: 0.75rem; color: var(--warning); margin-top: 8px;">
+                Demo mode — add your OpenRouter API key in <a href="/admin/settings" style="color: var(--gold);">Settings</a> for real AI emails.
+            </p>
+
+            <!-- Send via Gmail -->
+            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-light);">
+                {% if gmail_connected %}
+                <div style="font-size: 0.75rem; color: var(--success); margin-bottom: 10px;">
+                    ✓ Gmail connected{% if gmail_email %} as {{ gmail_email }}{% endif %}
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">To</label>
+                        <input type="email" x-model="to" placeholder="lead@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Subject</label>
+                        <input type="text" x-model="subject" placeholder="Following up">
+                    </div>
+                </div>
+                <div class="flex items-center gap-3" style="flex-wrap: wrap;">
+                    <button class="btn btn-primary" @click="send()" :disabled="sending || !to.trim()">
+                        <span x-show="!sending">📤 Send via Gmail</span>
+                        <span x-show="sending" class="flex items-center gap-2"><span class="spinner spinner-sm"></span> Sending...</span>
+                    </button>
+                    <span x-show="sent" style="color: var(--success); font-size: 0.85rem; font-weight: 500;">✓ Sent!</span>
+                    <form method="POST" action="/admin/gmail/disconnect" style="margin-left: auto;">
+                        <button type="submit" class="btn btn-sm btn-outline">Disconnect</button>
+                    </form>
+                </div>
+                {% elif gmail_configured %}
+                <a href="/admin/gmail/connect" class="btn btn-primary">🔗 Connect Gmail to send directly</a>
+                <p style="font-size: 0.75rem; color: var(--text-subtle); margin-top: 8px;">Connect your Google account once to send emails without copy/paste.</p>
+                {% else %}
+                <p style="font-size: 0.78rem; color: var(--text-subtle); line-height: 1.6;">
+                    Want to send straight from the app? Add your Google OAuth credentials
+                    (<code>GMAIL_CLIENT_ID</code> and <code>GMAIL_CLIENT_SECRET</code>) to your
+                    <code>.env</code> file, then a <strong>Connect Gmail</strong> button will appear here.
+                    Setup steps are in <code>services/gmail.py</code>.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function emailGen() {
+    return {
+        generating: false,
+        copied: false,
+        isDemo: false,
+        result: '',
+        to: {{ (contact.email if contact else '') | tojson }},
+        subject: '',
+        sending: false,
+        sent: false,
+        selectedId: '{{ contact.id if contact else "" }}',
+        lead: {
+            name: {{ (contact.name if contact else '') | tojson }},
+            lead_source: {{ (contact.lead_source if contact else '') | tojson }},
+            lead_type: {{ (contact.lead_type if contact else 'Buyer') | tojson }},
+            stage: {{ (contact.status if contact else 'Lead') | tojson }},
+            notes: {{ (contact.property_interests if contact else '') | tojson }},
+        },
+        leads: {{ contacts_json | tojson }},
+        loadLead() {
+            if (!this.selectedId) return;
+            const c = this.leads.find(l => String(l.id) === String(this.selectedId));
+            if (!c) return;
+            this.lead.name = c.name || '';
+            this.lead.lead_source = c.lead_source || '';
+            this.lead.lead_type = c.lead_type || 'Buyer';
+            this.lead.stage = c.status || 'Lead';
+            this.lead.notes = c.property_interests || '';
+            this.to = c.email || '';
+        },
+        async generate() {
+            if (!this.lead.name.trim()) return;
+            this.generating = true;
+            this.result = '';
+            try {
+                const payload = this.selectedId
+                    ? { contact_id: this.selectedId, stage: this.lead.stage, notes: this.lead.notes }
+                    : { ...this.lead };
+                const resp = await fetch('/api/generate-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    this.result = data.email;
+                    this.isDemo = !!data.demo;
+                    this.sent = false;
+                    if (!this.subject.trim()) this.subject = 'Following up';
+                } else {
+                    alert(data.error || 'Failed to generate email');
+                }
+            } catch (e) {
+                alert('Network error. Please try again.');
+            } finally {
+                this.generating = false;
+            }
+        },
+        copy() {
+            navigator.clipboard.writeText(this.result).then(() => {
+                this.copied = true;
+                setTimeout(() => this.copied = false, 2000);
+            });
+        },
+        async send() {
+            if (!this.to.trim() || !this.result.trim()) return;
+            this.sending = true;
+            this.sent = false;
+            try {
+                const resp = await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        to: this.to,
+                        subject: this.subject,
+                        body: this.result,
+                        contact_id: this.selectedId || null
+                    })
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    this.sent = true;
+                } else {
+                    alert(data.error || 'Failed to send email');
+                }
+            } catch (e) {
+                alert('Network error. Please try again.');
+            } finally {
+                this.sending = false;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

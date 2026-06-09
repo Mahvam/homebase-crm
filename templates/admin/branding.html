@@ -1,0 +1,117 @@
+{% extends "base_admin.html" %}
+
+{% block page_title %}Branding{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">Make it yours. Set your colors and logo, and they apply across the whole app instantly.</p>{% endblock %}
+
+{% block content %}
+<form method="POST" action="/admin/branding" enctype="multipart/form-data"
+      x-data="brandingPage()" class="grid-2" style="align-items: start; gap: 20px;">
+
+    <!-- LEFT: Colors -->
+    <div class="card">
+        <h3 style="color: var(--text-primary); font-weight: 600; font-size: 0.95rem; margin: 0 0 16px;">Brand Colors</h3>
+
+        <div class="form-group">
+            <label class="form-label">Primary color</label>
+            <p style="font-size: 0.75rem; color: var(--text-subtle); margin: 0 0 8px;">Buttons, links, highlights, and the active nav.</p>
+            <div class="flex items-center gap-3">
+                <input type="color" x-model="primary" style="width: 48px; height: 40px; padding: 2px; border-radius: 8px; cursor: pointer; background: var(--bg-input);">
+                <input type="text" x-model="primary" name="primary_color" style="flex: 1;" placeholder="#C7A35A">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Accent color</label>
+            <p style="font-size: 0.75rem; color: var(--text-subtle); margin: 0 0 8px;">Hover states and glow accents.</p>
+            <div class="flex items-center gap-3">
+                <input type="color" x-model="accent" style="width: 48px; height: 40px; padding: 2px; border-radius: 8px; cursor: pointer; background: var(--bg-input);">
+                <input type="text" x-model="accent" name="accent_color" style="flex: 1;" placeholder="#B88933">
+            </div>
+        </div>
+
+        <!-- Live preview -->
+        <div style="margin-top: 20px; padding: 18px; border-radius: 12px; border: 1px solid var(--border-light); background: var(--bg-card);">
+            <div style="font-size: 0.75rem; color: var(--text-subtle); margin-bottom: 12px; letter-spacing: 0.03em;">LIVE PREVIEW</div>
+            <div class="flex items-center gap-3" style="flex-wrap: wrap;">
+                <button type="button" :style="`background:${primary}; color:#0B0B0D; border:none; padding:8px 16px; border-radius:8px; font-weight:600; font-size:0.85rem;`">Primary Button</button>
+                <button type="button" :style="`background:transparent; color:${primary}; border:1px solid ${primary}; padding:8px 16px; border-radius:8px; font-weight:600; font-size:0.85rem;`"
+                        @mouseover="$el.style.background=accent; $el.style.color='#0B0B0D'" @mouseout="$el.style.background='transparent'; $el.style.color=primary">Hover Me</button>
+                <span :style="`color:${primary}; font-weight:600; font-size:0.85rem;`">Sample link</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: Images -->
+    <div class="card">
+        <h3 style="color: var(--text-primary); font-weight: 600; font-size: 0.95rem; margin: 0 0 16px;">Logo &amp; Photo</h3>
+
+        <!-- Logo -->
+        <div class="form-group">
+            <label class="form-label">Logo</label>
+            <p style="font-size: 0.75rem; color: var(--text-subtle); margin: 0 0 8px;">Shown in the sidebar and mobile header. PNG with transparency works best.</p>
+            <div class="flex items-center gap-3">
+                <div style="width: 64px; height: 64px; border-radius: 10px; background: var(--bg-input); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+                    <template x-if="logoPreview">
+                        <img :src="logoPreview" style="width: 100%; height: 100%; object-fit: contain;">
+                    </template>
+                    <template x-if="!logoPreview">
+                        <span style="font-size: 0.7rem; color: var(--text-subtle);">None</span>
+                    </template>
+                </div>
+                <div style="flex: 1;">
+                    <input type="file" name="logo" accept="image/*" @change="preview($event, 'logo')">
+                    <label x-show="logoPreview" style="display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 0.8rem; color: var(--text-subtle); cursor: pointer;">
+                        <input type="checkbox" name="remove_logo" value="1" style="width: auto;"> Remove current logo
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile photo -->
+        <div class="form-group" style="margin-top: 20px;">
+            <label class="form-label">Profile photo</label>
+            <p style="font-size: 0.75rem; color: var(--text-subtle); margin: 0 0 8px;">A headshot. Used as the brand image if no logo is set.</p>
+            <div class="flex items-center gap-3">
+                <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--bg-input); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+                    <template x-if="profilePreview">
+                        <img :src="profilePreview" style="width: 100%; height: 100%; object-fit: cover;">
+                    </template>
+                    <template x-if="!profilePreview">
+                        <span style="font-size: 0.7rem; color: var(--text-subtle);">None</span>
+                    </template>
+                </div>
+                <div style="flex: 1;">
+                    <input type="file" name="profile" accept="image/*" @change="preview($event, 'profile')">
+                    <label x-show="profilePreview" style="display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 0.8rem; color: var(--text-subtle); cursor: pointer;">
+                        <input type="checkbox" name="remove_profile" value="1" style="width: auto;"> Remove current photo
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+            <button type="submit" class="btn btn-primary">Save Branding</button>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function brandingPage() {
+    return {
+        primary: {{ branding_data.primary | tojson }},
+        accent: {{ branding_data.accent | tojson }},
+        logoPreview: {{ branding_data.logo_url | tojson }},
+        profilePreview: {{ branding_data.profile_url | tojson }},
+        preview(event, which) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const url = URL.createObjectURL(file);
+            if (which === 'logo') this.logoPreview = url;
+            else this.profilePreview = url;
+        }
+    };
+}
+</script>
+{% endblock %}

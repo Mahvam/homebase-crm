@@ -1,0 +1,230 @@
+{% extends "base_admin.html" %}
+
+{% block page_title %}Leads{% endblock %}
+{% block page_subtitle %}<p class="page-subtitle">All your leads, their pipeline stage, and a one-click follow-up email.</p>{% endblock %}
+
+{% block page_actions %}
+<button class="btn btn-primary" @click="$dispatch('open-add-lead')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Add Lead
+</button>
+{% endblock %}
+
+{% block content %}
+<div x-data="leadsPage()" @open-add-lead.window="showAddModal = true">
+    <!-- Toolbar: Search + Stage filter -->
+    <div class="flex items-center gap-4" style="margin-bottom: 24px; flex-wrap: wrap;">
+        <form method="GET" action="/admin/contacts" class="search-bar" style="flex: 1; min-width: 200px;">
+            <span class="search-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </span>
+            <input type="search" name="q" placeholder="Search leads..." value="{{ q or '' }}" autocomplete="off">
+            {% if q %}
+            <a href="/admin/contacts" class="search-clear" title="Clear search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </a>
+            {% endif %}
+        </form>
+
+        <div class="flex items-center gap-2" style="flex-wrap: wrap;">
+            <a href="/admin/contacts" class="btn btn-sm {% if not status_filter %}btn-secondary{% else %}btn-outline{% endif %}">All</a>
+            {% for st in stages %}
+            <a href="/admin/contacts?status={{ st }}" class="btn btn-sm {% if status_filter == st %}btn-secondary{% else %}btn-outline{% endif %}">{{ st }}</a>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if contacts %}
+    <div class="table-wrapper" style="display: block;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Stage</th>
+                    <th>Source</th>
+                    <th>Last Contact</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for contact in contacts %}
+                <tr>
+                    <td onclick="window.location='/admin/contacts/{{ contact.id }}'" style="cursor: pointer;">
+                        <div class="flex items-center gap-3">
+                            <div class="avatar avatar-sm">{{ contact.name[0].upper() if contact.name else '?' }}</div>
+                            <div>
+                                <div style="font-weight: 500;">{{ contact.name }}</div>
+                                <div style="font-size: 0.75rem; color: var(--text-subtle);">{{ contact.email or contact.phone or '--' }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>{{ contact.lead_type or '--' }}</td>
+                    <td><span class="badge badge-lead">{{ contact.status or 'Lead' }}</span></td>
+                    <td>{{ contact.lead_source or '--' }}</td>
+                    <td style="color: var(--text-subtle); font-size: 0.8125rem;">
+                        {{ contact.last_contact_at.strftime('%b %d, %Y') if contact.last_contact_at else 'Never' }}
+                    </td>
+                    <td style="text-align: right;">
+                        <a href="/admin/email-generator/{{ contact.id }}" class="btn btn-sm btn-outline" title="Generate follow-up email">
+                            ✨ Email
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Mobile cards -->
+    <div class="mobile-contact-cards" style="display: none;">
+        {% for contact in contacts %}
+        <div class="card" style="margin-bottom: 12px;">
+            <a href="/admin/contacts/{{ contact.id }}" style="display: block; text-decoration: none;">
+                <div class="flex items-center gap-3" style="margin-bottom: 10px;">
+                    <div class="avatar">{{ contact.name[0].upper() if contact.name else '?' }}</div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 600; color: var(--text-primary);">{{ contact.name }}</div>
+                        <div style="font-size: 0.8125rem; color: var(--text-subtle);">{{ contact.lead_type }} · {{ contact.lead_source or 'No source' }}</div>
+                    </div>
+                    <span class="badge badge-lead">{{ contact.status or 'Lead' }}</span>
+                </div>
+            </a>
+            <a href="/admin/email-generator/{{ contact.id }}" class="btn btn-sm btn-outline" style="width: 100%;">✨ Generate Follow-Up Email</a>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="card">
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <h3 class="empty-state-heading">No leads found</h3>
+            <p class="empty-state-description">
+                {% if q %}No leads match "{{ q }}".
+                {% elif status_filter %}No leads in the "{{ status_filter }}" stage.
+                {% else %}Add your first lead to get started.{% endif %}
+            </p>
+            {% if not q and not status_filter %}
+            <button class="btn btn-primary" @click="showAddModal = true">Add Your First Lead</button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Add Lead Modal (Feature 2: Lead Intake Form) -->
+    <div class="modal-overlay" x-show="showAddModal" x-cloak
+         x-transition @click.self="showAddModal = false"
+         @keydown.escape.window="showAddModal = false">
+        <div class="modal" @click.stop>
+            <div class="modal-header">
+                <h3 class="modal-title">Add New Lead</h3>
+                <button class="modal-close" @click="showAddModal = false">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form @submit.prevent="submitLead()">
+                    <div class="form-group">
+                        <label class="form-label">Name <span class="required">*</span></label>
+                        <input type="text" x-model="newLead.name" placeholder="Full name" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Email</label>
+                            <input type="email" x-model="newLead.email" placeholder="email@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" x-model="newLead.phone" placeholder="(555) 123-4567">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Lead Source</label>
+                            <select x-model="newLead.lead_source">
+                                <option value="">Select source...</option>
+                                {% for s in lead_sources %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Lead Type</label>
+                            <select x-model="newLead.lead_type">
+                                {% for t in lead_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Pipeline Stage</label>
+                        <select x-model="newLead.status">
+                            {% for st in stages %}<option value="{{ st }}">{{ st }}</option>{% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Notes / Property Interests</label>
+                        <textarea x-model="newLead.property_interests" rows="3" placeholder="e.g. 3 bed 2 bath in St. Joseph, budget ~$250k"></textarea>
+                    </div>
+
+                    <div class="modal-footer" style="padding: 16px 0 0; margin-top: 8px; border-top: 1px solid var(--border-light);">
+                        <button type="button" class="btn btn-outline" @click="showAddModal = false">Cancel</button>
+                        <button type="submit" class="btn btn-primary" :disabled="submitting">
+                            <span x-show="!submitting">Save Lead</span>
+                            <span x-show="submitting" class="flex items-center gap-2"><span class="spinner spinner-sm"></span> Saving...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @media (max-width: 768px) {
+        .table-wrapper { display: none !important; }
+        .mobile-contact-cards { display: block !important; }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function leadsPage() {
+    return {
+        showAddModal: false,
+        submitting: false,
+        newLead: {
+            name: '', email: '', phone: '',
+            lead_source: '', lead_type: 'Buyer',
+            status: 'Lead', property_interests: ''
+        },
+        async submitLead() {
+            if (!this.newLead.name.trim()) return;
+            this.submitting = true;
+            try {
+                const resp = await fetch('/api/contacts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.newLead)
+                });
+                if (resp.ok) {
+                    window.location.reload();
+                } else {
+                    const data = await resp.json();
+                    alert(data.error || 'Failed to create lead');
+                    this.submitting = false;
+                }
+            } catch (err) {
+                alert('Network error. Please try again.');
+                this.submitting = false;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

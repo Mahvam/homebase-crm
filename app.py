@@ -1,0 +1,219 @@
+import os
+from flask import Flask, session
+from dotenv import load_dotenv
+
+from extensions import db
+
+load_dotenv()
+
+# Default theme colors (match the gold palette in static/css/custom.css)
+DEFAULT_PRIMARY = "#C7A35A"
+DEFAULT_ACCENT = "#B88933"
+
+
+def _hex_to_rgb(hx, fallback="199, 163, 90"):
+    """Convert '#RRGGBB' (or '#RGB') to an 'r, g, b' string for rgba() use."""
+    hx = (hx or "").strip().lstrip("#")
+    if len(hx) == 3:
+        hx = "".join(c * 2 for c in hx)
+    try:
+        return f"{int(hx[0:2], 16)}, {int(hx[2:4], 16)}, {int(hx[4:6], 16)}"
+    except (ValueError, IndexError):
+        return fallback
+
+
+def get_branding():
+    """Build the branding dict (colors + images) from saved settings.
+
+    Read on every request so changes apply app-wide without a restart. Falls
+    back to theme defaults and never raises (DB may be mid-setup)."""
+    primary, accent = DEFAULT_PRIMARY, DEFAULT_ACCENT
+    logo_url = profile_url = ""
+    try:
+        from models import Setting
+        primary = Setting.get("BRAND_PRIMARY_COLOR") or DEFAULT_PRIMARY
+        accent = Setting.get("BRAND_ACCENT_COLOR") or DEFAULT_ACCENT
+        logo_url = Setting.get("BRAND_LOGO_URL") or ""
+        profile_url = Setting.get("BRAND_PROFILE_URL") or ""
+    except Exception:
+        pass
+    return {
+        "primary": primary,
+        "accent": accent,
+        "primary_rgb": _hex_to_rgb(primary),
+        "accent_rgb": _hex_to_rgb(accent, "184, 137, 51"),
+        "logo_url": logo_url,
+        "profile_url": profile_url,
+        # The image shown in the sidebar/header: prefer the logo, else the photo
+        "brand_image": logo_url or profile_url,
+    }
+
+
+def create_app():
+    app = Flask(__name__)
+
+    # --- Database ---
+    database_url = os.environ.get("DATABASE_URL", "sqlite:///app.db")
+    # Fix legacy postgres:// URLs (Railway still emits these)
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+    # --- Security ---
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-me-in-production")
+    app.config["ADMIN_USER"] = os.environ.get("ADMIN_USER", "admin")
+    app.config["ADMIN_PASS"] = os.environ.get("ADMIN_PASS", "admin")
+
+    # --- Branding ---
+    app.config["BUSINESS_NAME"] = os.environ.get("BUSINESS_NAME", "Danielle's AI CRM")
+
+    # --- Feature Toggles ---
+    # Danielle's CRM is deliberately focused on the 3 brief features (Leads,
+    # Lead Intake, AI Follow-Up Email). The boilerplate's extra modules are
+    # off by default but can be re-enabled via env vars.
+    app.config["FEATURE_PRODUCTS"]  = os.environ.get("FEATURE_PRODUCTS",  "false").lower() == "true"
+    app.config["FEATURE_CLIENTS"]   = os.environ.get("FEATURE_CLIENTS",   "false").lower() == "true"
+    app.config["FEATURE_TASKS"]     = os.environ.get("FEATURE_TASKS",     "false").lower() == "true"
+    app.config["FEATURE_EMAIL"]     = os.environ.get("FEATURE_EMAIL",     "false").lower() == "true"
+    app.config["FEATURE_ANALYTICS"] = os.environ.get("FEATURE_ANALYTICS", "false").lower() == "true"
+    app.config["FEATURE_BOOKINGS"]  = os.environ.get("FEATURE_BOOKINGS",  "false").lower() == "true"
+
+    # --- Jackie AI / OpenAI ---
+    app.config["OPENAI_API_KEY"]    = os.environ.get("OPENAI_API_KEY", "")
+    app.config["CHAT_PROVIDER"]     = os.environ.get("CHAT_PROVIDER", "openai")
+    app.config["OPENAI_CHAT_MODEL"] = os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini")
+
+    # --- Umami Analytics ---
+    app.config["UMAMI_WEBSITE_ID"]  = os.environ.get("UMAMI_WEBSITE_ID", "")
+    app.config["UMAMI_SCRIPT_URL"]  = os.environ.get("UMAMI_SCRIPT_URL", "https://cloud.umami.is/script.js")
+
+    # --- Zernio (social media publishing, formerly GetLate) ---
+    app.config["ZERNIO_API_KEY"]    = os.environ.get("ZERNIO_API_KEY", os.environ.get("GETLATE_API_KEY", ""))
+    app.config["ZERNIO_PROFILE_ID"] = os.environ.get("ZERNIO_PROFILE_ID", "")
+
+    # --- CRM Integration Keys ---
+    app.config["STRIPE_CHECKOUT_URL"]   = os.environ.get("STRIPE_CHECKOUT_URL", "")
+    app.config["LEAD_MAGNET_URL"]       = os.environ.get("LEAD_MAGNET_URL", "")
+    app.config["OPENROUTER_API_KEY"]    = os.environ.get("OPENROUTER_API_KEY", "")
+
+    # --- Gmail OAuth (send generated emails directly) ---
+    app.config["GMAIL_CLIENT_ID"]     = os.environ.get("GMAIL_CLIENT_ID", "")
+    app.config["GMAIL_CLIENT_SECRET"] = os.environ.get("GMAIL_CLIENT_SECRET", "")
+
+    # --- Content Automation Keys ---
+    app.config["FIRECRAWL_API_KEY"]     = os.environ.get("FIRECRAWL_API_KEY", "")
+    app.config["KIE_AI_API_KEY"]        = os.environ.get("KIE_AI_API_KEY", "")
+    app.config["GETLATE_API_KEY"]       = os.environ.get("GETLATE_API_KEY", "")
+
+    # --- Stripe ---
+    app.config["STRIPE_SECRET_KEY"]      = os.environ.get("STRIPE_SECRET_KEY", "")
+    app.config["STRIPE_PUBLISHABLE_KEY"] = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
+
+    # --- Resend (email) ---
+    app.config["RESEND_API_KEY"]    = os.environ.get("RESEND_API_KEY", "")
+    app.config["RESEND_FROM_EMAIL"] = os.environ.get("RESEND_FROM_EMAIL", "")
+
+    # --- Cloudflare R2 Storage ---
+    app.config["R2_ACCOUNT_ID"]        = os.environ.get("R2_ACCOUNT_ID", "")
+    app.config["R2_ACCESS_KEY_ID"]     = os.environ.get("R2_ACCESS_KEY_ID", "")
+    app.config["R2_SECRET_ACCESS_KEY"] = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+    app.config["R2_BUCKET_NAME"]       = os.environ.get("R2_BUCKET_NAME", "")
+    app.config["R2_PUBLIC_URL"]        = os.environ.get("R2_PUBLIC_URL", "")
+
+    # --- Init extensions ---
+    db.init_app(app)
+
+    # --- Register blueprints ---
+    from blueprints.public import public_bp
+    from blueprints.admin import admin_bp
+    from blueprints.api import api_bp
+    from blueprints.content import content_bp
+    from blueprints.content_api import content_api_bp
+    from blueprints.help import help_bp
+
+    app.register_blueprint(public_bp,     url_prefix="/")
+    app.register_blueprint(admin_bp,      url_prefix="/admin")
+    app.register_blueprint(api_bp,        url_prefix="/api")
+    app.register_blueprint(content_bp,    url_prefix="/content")
+    app.register_blueprint(content_api_bp, url_prefix="/content/api")
+    app.register_blueprint(help_bp,       url_prefix="/help")
+
+    from blueprints.jackie import jackie_bp
+    app.register_blueprint(jackie_bp,    url_prefix="/jackie")
+
+    from blueprints.onboarding import onboarding_bp
+    app.register_blueprint(onboarding_bp, url_prefix="/onboarding")
+
+    if app.config["FEATURE_BOOKINGS"]:
+        from blueprints.bookings import bookings_bp
+        app.register_blueprint(bookings_bp, url_prefix="/bookings")
+
+    if app.config["FEATURE_PRODUCTS"]:
+        from blueprints.products import products_bp
+        app.register_blueprint(products_bp, url_prefix="/products")
+
+    if app.config["FEATURE_CLIENTS"]:
+        from blueprints.clients import clients_bp
+        app.register_blueprint(clients_bp, url_prefix="/clients")
+
+    if app.config["FEATURE_TASKS"]:
+        from blueprints.tasks import tasks_bp
+        app.register_blueprint(tasks_bp, url_prefix="/tasks")
+
+    if app.config["FEATURE_EMAIL"]:
+        from blueprints.email import email_bp
+        app.register_blueprint(email_bp, url_prefix="/email")
+
+    # --- Context processor ---
+    @app.context_processor
+    def inject_globals():
+        return {
+            "business_name": app.config["BUSINESS_NAME"],
+            "stripe_checkout_url": app.config["STRIPE_CHECKOUT_URL"],
+            "lead_magnet_url": app.config["LEAD_MAGNET_URL"],
+            "branding": get_branding(),
+            "features": {
+                "products":  app.config["FEATURE_PRODUCTS"],
+                "clients":   app.config["FEATURE_CLIENTS"],
+                "tasks":     app.config["FEATURE_TASKS"],
+                "email":     app.config["FEATURE_EMAIL"],
+                "analytics": app.config["FEATURE_ANALYTICS"],
+                "bookings":  app.config["FEATURE_BOOKINGS"],
+            },
+        }
+
+    # --- Create tables & auto-seed on first run ---
+    with app.app_context():
+        db.create_all()
+
+        # API keys saved via the Settings page are stored in the DB. Without
+        # this, they were lost on every restart (launch.command) and every
+        # service silently fell back to "demo mode" even though the student
+        # had entered valid keys. Load them back into the environment so the
+        # service modules (which read os.getenv) pick them up.
+        try:
+            from models import Setting
+            for s in Setting.query.all():
+                if s.value:
+                    os.environ[s.key] = s.value
+                    app.config[s.key] = s.value
+        except Exception as e:  # never let settings load block startup
+            print(f"Could not load saved settings into environment: {e}")
+
+        # Auto-seed if the database is empty (first run)
+        from models import Contact
+        if Contact.query.first() is None:
+            print("Empty database detected -- seeding demo data...")
+            from seed import run_seed
+            run_seed()
+
+    return app
+
+
+# Module-level app instance for gunicorn
+app = create_app()
+
+if __name__ == "__main__":
+    app.run(debug=True, port=8000)
