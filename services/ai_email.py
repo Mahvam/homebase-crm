@@ -33,7 +33,10 @@ STAGE_GUIDANCE = {
 
 def _get_client():
     """OpenAI client pointed at OpenRouter, or None if no key is set."""
-    api_key = os.getenv("OPENROUTER_API_KEY")
+    # Strip whitespace/newlines: a key like "sk-...\n" (or a stray space) is
+    # truthy but produces a malformed "Authorization: Bearer" header, which
+    # OpenRouter rejects with 401 "Missing Authentication header".
+    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
     if not api_key:
         return None
     return OpenAI(

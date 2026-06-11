@@ -193,12 +193,25 @@ def create_app():
         # service silently fell back to "demo mode" even though the student
         # had entered valid keys. Load them back into the environment so the
         # service modules (which read os.getenv) pick them up.
+        #
+        # IMPORTANT: a real platform environment variable (e.g. one set in the
+        # Railway dashboard) always wins. Previously a blank/whitespace DB row
+        # would clobber a correctly-set Railway key, and the service then sent
+        # an empty "Authorization: Bearer" header -> OpenRouter 401
+        # "Missing Authentication header". So we only fall back to the DB value
+        # when the env var is not already set, and we ignore blank values.
         try:
             from models import Setting
             for s in Setting.query.all():
-                if s.value:
-                    os.environ[s.key] = s.value
-                    app.config[s.key] = s.value
+                value = (s.value or "").strip()
+                if not value:
+                    continue  # never load a blank key over a real one
+                existing = (os.environ.get(s.key) or "").strip()
+                if existing:
+                    app.config[s.key] = existing  # platform env var takes precedence
+                    continue
+                os.environ[s.key] = value
+                app.config[s.key] = value
         except Exception as e:  # never let settings load block startup
             print(f"Could not load saved settings into environment: {e}")
 
