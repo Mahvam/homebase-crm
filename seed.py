@@ -1,5 +1,5 @@
 """
-seed.py — Demo data for Danielle's AI CRM
+seed.py — Demo data for HomeBase CRM
 ==========================================
 Seeds a handful of realistic real-estate leads for Danielle, a solo agent in
 St. Joseph, MO. Uses her Follow Up Boss pipeline stages and lead sources from

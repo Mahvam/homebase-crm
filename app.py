@@ -67,7 +67,7 @@ def create_app():
     app.config["ADMIN_PASS"] = os.environ.get("ADMIN_PASS", "admin")
 
     # --- Branding ---
-    app.config["BUSINESS_NAME"] = os.environ.get("BUSINESS_NAME", "Danielle's AI CRM")
+    app.config["BUSINESS_NAME"] = os.environ.get("BUSINESS_NAME", "HomeBase CRM")
 
     # --- Feature Toggles ---
     # Danielle's CRM is deliberately focused on the 3 brief features (Leads,

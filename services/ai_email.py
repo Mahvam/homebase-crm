@@ -44,7 +44,7 @@ def _get_client():
         api_key=api_key,
         default_headers={
             "HTTP-Referer": os.getenv("APP_URL", "http://localhost:8000"),
-            "X-Title": "Danielle's AI CRM",
+            "X-Title": "HomeBase CRM",
         },
     )
 
