@@ -28,12 +28,7 @@ def login():
         else:
             flash("Invalid credentials. Please try again.", "danger")
 
-    from flask import current_app
-    default_creds = (
-        current_app.config["ADMIN_USER"] in ("admin", "instructor")
-        and current_app.config["ADMIN_PASS"] in ("admin", "changeme", "SaturdayWorkshop2026!")
-    )
-    return render_template("admin/login.html", default_creds=default_creds)
+    return render_template("admin/login.html")
 
 
 @admin_bp.route("/logout")
