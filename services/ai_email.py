@@ -18,8 +18,8 @@ import re
 import anthropic
 
 # Claude via OpenRouter. The brief asked for Claude (claude-sonnet-4); on
-# OpenRouter that model id is "anthropic/claude-sonnet-4".
-DEFAULT_MODEL = "anthropic/claude-sonnet-4"
+# OpenRouter that model id is "claude-sonnet-4-5".
+DEFAULT_MODEL = "claude-sonnet-4-5"
 
 # What each pipeline stage means, so the AI knows the right tone/intent.
 STAGE_GUIDANCE = {
