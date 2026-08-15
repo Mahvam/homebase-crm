@@ -75,9 +75,7 @@
 
         <div class="sidebar-footer">
             <div class="sidebar-branding" x-show="sidebarOpen">
-                <span class="brand-badge">Powered by Dr.AI</span>
-                <a href="https://simpletechskills.com/coaching" target="_blank" style="color: var(--text-tertiary); font-size: 0.65rem; text-decoration: none;">SimpleTechSkills</a>
-                <span style="display: block; color: var(--text-subtle); font-size: 0.6rem; margin-top: 2px;">v5.1</span>
+                <span class="brand-badge">Built by Mahva Moradian</span>
             </div>
             <a href="/admin/logout" class="sidebar-link">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -128,7 +126,7 @@
         <div class="chat-header" style="display: flex; align-items: center; justify-content: space-between;">
             <div>
                 <h3 style="color: var(--gold); font-weight: 600; margin: 0;">AI Assistant</h3>
-                <span style="color: var(--text-subtle); font-size: 0.75rem;">Powered by AI</span>
+                <span style="color: var(--text-subtle); font-size: 0.75rem;">Powered by EvenFlow Automation</span>
             </div>
             <button @click="chatMessages = [{ role: 'assistant', content: 'Chat history cleared. How can I help you?', timestamp: new Date().toISOString() }]; localStorage.setItem('crm-chat-history', JSON.stringify(chatMessages));" class="btn btn-ghost btn-sm" title="Clear chat history"
                     style="color: var(--text-subtle); font-size: 0.75rem; padding: 4px 8px;">
