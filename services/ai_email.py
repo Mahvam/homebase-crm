@@ -136,7 +136,7 @@ def generate_followup_email(name, lead_source=None, lead_type=None,
         + f"\n\nContext for this stage: {stage_note}"
     )
 
-    response = client.chat.completions.create(
+    response = client.messages.create(
         model=DEFAULT_MODEL,
         messages=[
             {"role": "system", "content": system_prompt},
