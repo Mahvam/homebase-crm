@@ -137,14 +137,14 @@ def generate_followup_email(name, lead_source=None, lead_type=None,
     )
 
     response = client.messages.create(
-        model=DEFAULT_MODEL,
+        model=DEFAULT_MODEL,system=system_prompt,
         messages=[
-            {"role": "system", "content": system_prompt},
+          
             {"role": "user", "content": user_prompt},
         ],
         max_tokens=500,
-        temperature=0.8,
+        
     )
 
-    text = _clean_email(response.choices[0].message.content.strip())
+    text = _clean_email(response.content[0].text.strip())
     return {"email": text, "model": DEFAULT_MODEL, "demo": False}
