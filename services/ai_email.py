@@ -15,7 +15,7 @@ always works during a live demo.
 
 import os
 import re
-from openai import OpenAI
+import anthropic
 
 # Claude via OpenRouter. The brief asked for Claude (claude-sonnet-4); on
 # OpenRouter that model id is "anthropic/claude-sonnet-4".
@@ -36,17 +36,10 @@ def _get_client():
     # Strip whitespace/newlines: a key like "sk-...\n" (or a stray space) is
     # truthy but produces a malformed "Authorization: Bearer" header, which
     # OpenRouter rejects with 401 "Missing Authentication header".
-    api_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
+    api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
     if not api_key:
         return None
-    return OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=api_key,
-        default_headers={
-            "HTTP-Referer": os.getenv("APP_URL", "http://localhost:8000"),
-            "X-Title": "HomeBase CRM",
-        },
-    )
+    return anthropic.Anthropic(api_key=api_key)
 
 
 def _clean_email(text):
