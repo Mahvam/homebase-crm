@@ -527,8 +527,9 @@ p {
   padding: var(--space-4) var(--space-4);
   border-top: 1px solid var(--border);
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
 }
 
 .sidebar-footer .user-avatar {
@@ -3418,9 +3419,7 @@ textarea.error {
 }
 
 .sidebar-branding {
-  padding: 0.75rem 1rem;
-  border-top: 1px solid var(--border-light);
-  margin-bottom: 0.5rem;
+  padding: 0 0.5rem 0.25rem;
 }
 
 .brand-badge {
@@ -3428,7 +3427,7 @@ textarea.error {
   color: var(--gold);
   font-weight: 600;
   font-size: 0.7rem;
-  margin-bottom: 0.15rem;
+  white-space: nowrap;
 }
 
 
